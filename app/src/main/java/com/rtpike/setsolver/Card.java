@@ -1,5 +1,8 @@
 package com.rtpike.setsolver;
 
+import android.graphics.Bitmap;
+import android.os.SystemClock;
+import android.os.Trace;
 import android.util.Log;
 
 import org.opencv.core.Core;
@@ -21,7 +24,12 @@ import java.util.List;
 
 import static org.opencv.core.Core.*;
 
-
+import java.util.List;
+import java.util.Vector;
+//import org.tensorflow.demo.OverlayView.DrawCallback;
+//import org.tensorflow.demo.env.BorderedText;
+//import org.tensorflow.demo.env.ImageUtils;
+//import org.tensorflow.demo.env.Logger;
 
 /**
  * Card Class for the Set cards
@@ -54,6 +62,26 @@ public class Card implements Runnable {
     public shapeEnum shape = shapeEnum.INVALID;  //"oval", "squiggle", "diamond"
     public Point[] corners; //From full parent image
 
+
+
+    private static final int INPUT_SIZE = 350;
+    private static final int IMAGE_MEAN = 128;
+    private static final float IMAGE_STD = 128.0f;
+    private static final String INPUT_NAME = "Mul:0";
+    private static final String OUTPUT_NAME = "final_result";
+
+    private static final String MODEL_FILE = "file:///android_asset/rounded_graph.pb";
+    private static final String LABEL_FILE = "file:///android_asset/retrained_labels.txt";
+
+    private static final boolean SAVE_PREVIEW_BITMAP = false;
+
+    private static final boolean MAINTAIN_ASPECT = true;
+
+    private static final android.util.Size DESIRED_PREVIEW_SIZE = new android.util.Size(640, 480);
+
+    private Classifier classifier;
+
+
     Card() {
     }
 
@@ -61,7 +89,21 @@ public class Card implements Runnable {
     Card(Mat cardImg) {
         int cropSize = 15;  //crop off 15 pixels per side
         this.cardImg = cardImg.submat(cropSize, cardImg.rows() - cropSize, cropSize, cardImg.cols() - cropSize); //crop off the edges
+
+
+//        classifier =
+//                TensorFlowImageClassifier.create(
+//                        getAssets(),
+//                        MODEL_FILE,
+//                        LABEL_FILE,
+//                        INPUT_SIZE,
+//                        IMAGE_MEAN,
+//                        IMAGE_STD,
+//                        INPUT_NAME,
+//                        OUTPUT_NAME);
+//
     }
+
     /* preload warpBox and input image. Use with the runnable */
     Card(MatOfPoint2f warpBox, Mat in) {
         this.warpBox = warpBox;
@@ -113,54 +155,38 @@ public class Card implements Runnable {
 
     /* Detect the shape and fill of the card */
     private void detectShape() {
+
+
+
         Mat gray = new Mat();
-        Mat blur = new Mat();
-        Mat thresh = new Mat();
-        Mat hierarchy = new Mat();
-        List<MatOfPoint> contours = new ArrayList<MatOfPoint>();
 
-/*        List<Mat> XYZ = new ArrayList<Mat>(3); //debug
-        Size ksize = new Size(1, 1);
-        Imgproc.cvtColor(cardImg_markup, blur, Imgproc.COLOR_RGB2XYZ);
-        split(blur,XYZ);
-        gray = XYZ.get(1); //debug*/
-
-        //FIXME: shadows can cause problem with shape detection
         Imgproc.cvtColor(cardImg_markup, gray, Imgproc.COLOR_RGB2GRAY);
 
-        //Imgproc.Canny(gray, thresh, 15, 60, 3, false); //debug
-        //Default Imgproc.adaptiveThreshold(gray, thresh, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C , Imgproc.THRESH_BINARY_INV, 15, 9); //debug
-        Imgproc.threshold(gray, thresh, 0, 255, Imgproc.THRESH_BINARY_INV+Imgproc.THRESH_OTSU);
-        //adaptiveCanny(gray,thresh);
-
-        //inRange(cardHSV, new Scalar(0, 25, 200), new Scalar(255, 255, 255), cardThreshold); //debug
-        ////blur = cardThreshold; //debug
-        //Imgproc.GaussianBlur(thresh, blur, new Size(5,5),0);
-        ///Imgproc.dilate(cardThreshold,cardThreshold,Imgproc.getStructuringElement(Imgproc.MORPH_ELLIPSE, new Size(5, 5)));
-        //Imgproc.morphologyEx(cardThreshold,cardThreshold,Imgproc.MORPH_CLOSE, Imgproc.getStructuringElement(Imgproc.MORPH_RECT, new Size(17, 17)));
-        Imgproc.findContours(thresh.clone(), contours, hierarchy, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-        ///Core.bitwise_and(cardImg_markup,cardImg_markup,blur,cardThreshold); //mask cardThreshold
+        //TODO: added tensorflow code to figure out number, fill and shape features
+        // See code: tensorflow-for-poets-2\android\src\org\tensorflow\demo\ClassifierActivity.java
 
 
 
-        //cardImg_markup = thresh; //Debug
-        //cardImg_markup = cardThreshold; //Debug
-        double area = 0, validConArea = 0;
-        MatOfPoint contours_0 = null;
+//        runInBackground(
+//                new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        final long startTime = SystemClock.uptimeMillis();
+//                        final List<Classifier.Recognition> results = classifier.recognizeImage(croppedBitmap);
+//                        lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
+//
+//                        cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
+//                        resultsView.setResults(results);
+//                        requestRender();
+//                        computing = false;
+//                    }
+//                });
+//
+//        Trace.endSection();
+//    }
 
-        int conNum, validConNum = 0;
 
-        int contour_size = contours.size();
-        for (conNum = 0; conNum < contour_size; conNum++) {
-            area = Imgproc.contourArea(contours.get(conNum));
-            if (area > 2000) {//debug
-                validConNum++;
-                validConArea = area;
-                contours_0 = contours.get(conNum);
-                Imgproc.drawContours(cardImg_markup, contours, conNum, new Scalar(0, 255, 255), 1);
-            }
-        }
-
+        int validConNum = 0;
         if (validConNum <= 3) {
             number = validConNum;
         } else {
@@ -171,76 +197,28 @@ public class Card implements Runnable {
             return;
         } //invalid number for concurs, exit
 
-        Rect rec = Imgproc.boundingRect(contours_0);
-        Point center = new Point(rec.x + rec.width / 2, rec.y + rec.height / 2);
 
-        Rect sampleRec = new Rect(new Point(center.x - rec.width / 8, center.y - rec.height / 8), new Point(center.x + rec.width / 8, center.y + rec.height / 8));
-
-        if (debug) {
-            Imgproc.circle(cardImg_markup, center, 4, new Scalar(0, 0, 0));
-            Imgproc.rectangle(cardImg_markup, sampleRec.tl(), sampleRec.br(), new Scalar(240, 0, 0));
-
-        }
-
-        double perimeter = Imgproc.arcLength(new MatOfPoint2f(contours_0.toArray()), true);
-        double areaVsPer = validConArea / perimeter;
-        Mat centerMat = cardHSV.submat(sampleRec);
-        Scalar mean = mean(centerMat);
-
-        MatOfPoint2f card_2f = new MatOfPoint2f(contours_0.toArray());
-        MatOfPoint2f approxCurve = new MatOfPoint2f();
-
-        // TODO:   Imgproc.HuMoments(contours_0);
-
-        //-------------------------------
-        Imgproc.approxPolyDP(card_2f, approxCurve, 0.014 * perimeter, true);
-
-        if (debug) {
-            Imgproc.putText(cardImg_markup, "" + approxCurve.height() + ", " + String.format("%.2f", areaVsPer), center, Core.FONT_HERSHEY_PLAIN, 1, new Scalar(0, 0, 0));
-            //Imgproc.draw(approxCurve, contours, conNum, new Scalar(0, 0, 255), 2);
-            Point[] curve_vertices = approxCurve.toArray(); //Fixme :faster way?
-            for (int p = 0; p < curve_vertices.length; p++) {
-                Imgproc.line(cardImg_markup, curve_vertices[p], curve_vertices[(p + 1) % curve_vertices.length], new Scalar(250, 0, 0), 1);
-            }
-            Log.d(TAG, "    Shape Info: " +
-                    " Num Poly corners:  " + approxCurve.height() +
-                    " areaVsPer: " + String.format("%.2f", areaVsPer));
-            Log.d(TAG, "    Fill Info: " + String.format("%.2f", mean.val[1]));
-            Log.d(TAG, "    mean color Info: " + String.format("%.2f", mean.val[0]) + ", " + String.format("%.2f", mean.val[2]));
-        }
 
         /* Fill
          * Solid < 150
          * lines: 240 - 220
          * empty: 255 - 250
          **/
-        if (mean.val[1] > 115) {
-            shade = shadeEnum.SOLID;
-        } else if (mean.val[1] <= 115 && mean.val[1] > 14) {//> 220 && mean.val[1] < 244){
-            shade = shadeEnum.LINES;
-        } else if (mean.val[1] <= 14) {// 244 && mean.val[1] <= 255) {
-            shade = shadeEnum.EMPTY;
-        }
+        shade = shadeEnum.SOLID;
+        shade = shadeEnum.LINES;
+        shade = shadeEnum.EMPTY;
+
 
         /* Find Shape using area vs perimeter
          * oval: 24 -28
          * squiggle: 18-20
          * demand:  < 18
          **/
-        MatOfPoint approxf1 = new MatOfPoint();
-        approxCurve.convertTo(approxf1, CvType.CV_32S);
-        Boolean isConvex = Imgproc.isContourConvex(approxf1);
-        if(debug) {
-            Log.d(TAG, "    isConvex: " + isConvex);
-        }
 
-        if (isConvex && (areaVsPer > 18 && areaVsPer < 32)) {
-            shape = shapeEnum.OVAL;
-        } else if (!isConvex && (areaVsPer > 16 && areaVsPer < 26) && (approxCurve.height() >= 7)) {
-            shape = shapeEnum.SQUIGGLE;
-        } else if (approxCurve.height() <= 6 || areaVsPer < 18) {
-            shape = shapeEnum.DIAMOND;
-        }
+        shape = shapeEnum.OVAL;
+        shape = shapeEnum.SQUIGGLE;
+        shape = shapeEnum.DIAMOND;
+
 
     }
 
