@@ -136,7 +136,7 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         mOpenCvCameraView.setMaxFrameSize(800, 600); //frame size
         mOpenCvCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        mProcessImage = new processImage();
+        mProcessImage = new processImage(this.getBaseContext());
         //FIXME mProcessImage.prepareNewGame();
 
     }

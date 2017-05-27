@@ -42,6 +42,12 @@ public class processImage { //} extends AsyncTask<Card, Void, Integer> {
     private int numCards = 0;
     //private boolean setFound = false;
     private Mat inputImage = null;
+    private static Context context;
+
+    processImage(Context c) {
+        context = c;
+    }
+
 
     public int numCards() {
         /* Returns number of cards detected */
@@ -117,7 +123,7 @@ public class processImage { //} extends AsyncTask<Card, Void, Integer> {
                     Mat ROI = new Mat();
                     warpSubImage(approxCurve, in, ROI);
 
-                    Card cardObj = new Card(ROI);
+                    Card cardObj = new Card(context, ROI);
                     //Card cardObj = new Card();
                     //Card cardObj = new Card(approxCurve, in);;
                     cardObj.cardName = String.format("%d", numCards); //used for debugging

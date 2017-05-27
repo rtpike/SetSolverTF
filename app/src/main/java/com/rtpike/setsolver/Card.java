@@ -1,5 +1,6 @@
 package com.rtpike.setsolver;
 
+import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -86,22 +87,21 @@ public class Card implements Runnable {
     }
 
 
-    Card(Mat cardImg) {
+    Card(Context c, Mat cardImg) {
         int cropSize = 15;  //crop off 15 pixels per side
         this.cardImg = cardImg.submat(cropSize, cardImg.rows() - cropSize, cropSize, cardImg.cols() - cropSize); //crop off the edges
 
 
-//        classifier =
-//                TensorFlowImageClassifier.create(
-//                        getAssets(),
-//                        MODEL_FILE,
-//                        LABEL_FILE,
-//                        INPUT_SIZE,
-//                        IMAGE_MEAN,
-//                        IMAGE_STD,
-//                        INPUT_NAME,
-//                        OUTPUT_NAME);
-//
+        classifier = TensorFlowImageClassifier.create(
+                        c.getAssets(),
+                        MODEL_FILE,
+                        LABEL_FILE,
+                        INPUT_SIZE,
+                        IMAGE_MEAN,
+                        IMAGE_STD,
+                        INPUT_NAME,
+                        OUTPUT_NAME);
+
     }
 
     /* preload warpBox and input image. Use with the runnable */
