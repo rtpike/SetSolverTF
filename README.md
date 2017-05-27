@@ -1,8 +1,11 @@
 
 
-**SetSolver** is a simple Android app uses OpenCV to find "sets" in the card game [Set](http://www.setgame.com/set).
+**SetSolver** is a simple Android app uses OpenCV and tensorflow to find "sets" in the card game [Set](http://www.setgame.com/set).
 
 [Set Wikipedia page](https://en.wikipedia.org/wiki/Set_(game))
+
+Some tensorfow and gradle code taken from https://github.com/googlecodelabs/tensorflow-for-poets-2, [Google Codelab](https://codelabs.developers.google.com/codelabs/tensorflow-for-poets-2/)
+
 
 ## Details
 
@@ -20,15 +23,10 @@ Tap on the screen to freeze the image.  Tap again to resume real-time camera cap
 
 ## Dependencies
 OpenCV 3.2.0 - OpenCV Manager can be installed via the google app store.
+Tensorflow 1.2.0
 
 ## Know Issues ##
 
 * Cards can't be overlapping and need to be on a high contrast background
 * Sharp shadows or poor lighting can cause the cards to be misidentified
-
-
-
-
-
-
 
