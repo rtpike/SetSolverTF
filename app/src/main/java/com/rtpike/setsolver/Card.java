@@ -25,6 +25,10 @@ import java.util.List;
 
 import static org.opencv.core.Core.*;
 
+import android.os.Handler;
+import android.os.HandlerThread;
+
+
 import java.util.List;
 import java.util.Vector;
 //import org.tensorflow.demo.OverlayView.DrawCallback;
@@ -38,11 +42,15 @@ import java.util.Vector;
  */
 
 
+
 public class Card implements Runnable {
     static final boolean debug = true;
     private static final String TAG = "Card";
     public String cardName = null;
     public Thread thread = null;
+
+    private Handler handler;
+    private HandlerThread handlerThread;
 
     /*FEATURES = {"symbol": ["oval", "squiggle", "diamond"],
         "color": ["red", "green", "purple"],
@@ -65,22 +73,8 @@ public class Card implements Runnable {
 
 
 
-    private static final int INPUT_SIZE = 350;
-    private static final int IMAGE_MEAN = 128;
-    private static final float IMAGE_STD = 128.0f;
-    private static final String INPUT_NAME = "Mul:0";
-    private static final String OUTPUT_NAME = "final_result";
 
-    private static final String MODEL_FILE = "file:///android_asset/rounded_graph.pb";
-    private static final String LABEL_FILE = "file:///android_asset/retrained_labels.txt";
-
-    private static final boolean SAVE_PREVIEW_BITMAP = false;
-
-    private static final boolean MAINTAIN_ASPECT = true;
-
-    private static final android.util.Size DESIRED_PREVIEW_SIZE = new android.util.Size(640, 480);
-
-    private Classifier classifier;
+    private static Classifier classifier;
 
 
     Card() {
@@ -92,17 +86,27 @@ public class Card implements Runnable {
         this.cardImg = cardImg.submat(cropSize, cardImg.rows() - cropSize, cropSize, cardImg.cols() - cropSize); //crop off the edges
 
 
-        classifier = TensorFlowImageClassifier.create(
-                        c.getAssets(),
-                        MODEL_FILE,
-                        LABEL_FILE,
-                        INPUT_SIZE,
-                        IMAGE_MEAN,
-                        IMAGE_STD,
-                        INPUT_NAME,
-                        OUTPUT_NAME);
+    }
+
+    Card(Context c, Mat cardImg,Classifier classifier) {
+        int cropSize = 15;  //crop off 15 pixels per side
+        this.cardImg = cardImg.submat(cropSize, cardImg.rows() - cropSize, cropSize, cardImg.cols() - cropSize); //crop off the edges
+
+        this.classifier = classifier;
+
+/*        classifier = TensorFlowImageClassifier.create(
+                c.getAssets(),
+                MODEL_FILE,
+                LABEL_FILE,
+                INPUT_SIZE,
+                IMAGE_MEAN,
+                IMAGE_STD,
+                INPUT_NAME,
+                OUTPUT_NAME);
+*/
 
     }
+
 
     /* preload warpBox and input image. Use with the runnable */
     Card(MatOfPoint2f warpBox, Mat in) {
@@ -156,71 +160,46 @@ public class Card implements Runnable {
     /* Detect the shape and fill of the card */
     private void detectShape() {
 
+        //Mat gray = new Mat();
+        //Imgproc.cvtColor(cardImg_markup, gray, Imgproc.COLOR_RGB2GRAY);
 
 
-        Mat gray = new Mat();
+        Bitmap bmp = Bitmap.createBitmap(cardImg_markup.cols(), cardImg_markup.rows(), Bitmap.Config.ARGB_8888);
+        List<Classifier.Recognition> results = classifier.recognizeImage(bmp);
 
-        Imgproc.cvtColor(cardImg_markup, gray, Imgproc.COLOR_RGB2GRAY);
-
-        //TODO: added tensorflow code to figure out number, fill and shape features
-        // See code: tensorflow-for-poets-2\android\src\org\tensorflow\demo\ClassifierActivity.java
-
-
-
-//        runInBackground(
-//                new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        final long startTime = SystemClock.uptimeMillis();
-//                        final List<Classifier.Recognition> results = classifier.recognizeImage(croppedBitmap);
-//                        lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
-//
-//                        cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
-//                        resultsView.setResults(results);
-//                        requestRender();
-//                        computing = false;
-//                    }
-//                });
-//
-//        Trace.endSection();
-//    }
-
-
-        int validConNum = 0;
-        if (validConNum <= 3) {
-            number = validConNum;
-        } else {
-            number = -2; //error
+/*      public Recognition(
+            final String id, final String title, final Float confidence, final RectF location) {
+            this.id = id;
+            this.title = title;
+            this.confidence = confidence;
+            this.location = location;
+        }*/
+        if (debug) {
+            for (Classifier.Recognition result: results) {
+                Log.d(TAG, "    " +  result);
+            }
         }
+        endodeCard(results.get(0)); //sets number, shade and shape
 
-        if (number <= 0) {
-            return;
-        } //invalid number for concurs, exit
+/*        runInBackground(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        //final long startTime = SystemClock.uptimeMillis();
+                        final Bitmap bmp = Bitmap.createBitmap(cardImg_markup.cols(), cardImg_markup.rows(), Bitmap.Config.ARGB_8888);
+                        final List<Classifier.Recognition> results = classifier.recognizeImage(bmp);
+                        //lastProcessingTimeMs = SystemClock.uptimeMillis() - startTime;
 
+                        //cropCopyBitmap = Bitmap.createBitmap(croppedBitmap);
+                        //resultsView.setResults(results);
+                        //requestRender();
+                        //computing = false;
+                    }
+                });*/
 
-
-        /* Fill
-         * Solid < 150
-         * lines: 240 - 220
-         * empty: 255 - 250
-         **/
-        shade = shadeEnum.SOLID;
-        shade = shadeEnum.LINES;
-        shade = shadeEnum.EMPTY;
-
-
-        /* Find Shape using area vs perimeter
-         * oval: 24 -28
-         * squiggle: 18-20
-         * demand:  < 18
-         **/
-
-        shape = shapeEnum.OVAL;
-        shape = shapeEnum.SQUIGGLE;
-        shape = shapeEnum.DIAMOND;
-
-
+        Trace.endSection();
     }
+
 
     private void detectColor() {
 
@@ -364,6 +343,81 @@ public class Card implements Runnable {
         }
     }
 
+    private void endodeCard(Classifier.Recognition result) {
+        /*  Decode the Card attributes into a string
+            example: "2,G,S"
+         */
+        String colorStr, shadeStr, shapeStr;
+        String[] features = result.getTitle().split("_"); //example: 1_p_e_s
+
+        if (features.length != 4) {
+            //TODO: throw exception;
+            return;
+        }
+
+        number = Integer.parseInt(features[0]);
+        colorStr = features[1];
+        shadeStr = features[2];
+        shapeStr = features[3];
+
+
+/*       shade = shadeEnum.SOLID;
+        shade = shadeEnum.LINES;
+        shade = shadeEnum.EMPTY;
+
+        shape = shapeEnum.OVAL;
+        shape = shapeEnum.SQUIGGLE;
+        shape = shapeEnum.DIAMOND;*/
+
+//FIXME: color done in detectColor
+/*        switch (colorStr) {
+            case "r":
+                color =colorEnum.RED;
+                break;
+            case "g":
+                color = colorEnum.GREEN;
+                break;
+            case "p":
+                color = colorEnum.PURPLE;
+                break;
+            default:
+                color = colorEnum.INVALID;
+                break;
+        }*/
+
+        switch (shadeStr) {
+            case "e":
+                shade = shadeEnum.EMPTY;
+                break;
+            case "l":
+                shade = shadeEnum.LINES;
+            case "s":
+                shade = shadeEnum.SOLID;
+                break;
+            default:
+                shade = shadeEnum.INVALID;
+                break;
+        }
+
+        switch (shapeStr) {
+            case "d":
+                shape = shapeEnum.DIAMOND;
+                break;
+            case "o":
+                shape = shapeEnum.OVAL;
+                break;
+            case "s":
+                shape = shapeEnum.SQUIGGLE;
+                break;
+            default:
+                shape = shapeEnum.INVALID;
+                break;
+        }
+
+    }
+
+
+
     @Override
     public String toString() {
         return decodeCard();
@@ -412,6 +466,13 @@ public class Card implements Runnable {
         int upper = (int) Math.min(255, (1.0 + sigma) * mean.val[0]);
 
         Imgproc.Canny(blur, out, lower, upper, 3, false);
+    }
+
+
+    protected synchronized void runInBackground(final Runnable r) {
+        if (handler != null) {
+            handler.post(r);
+        }
     }
 
     /* Used for threading */

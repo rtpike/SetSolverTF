@@ -36,6 +36,24 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
     //View.OnTouchListener,
     private static final String TAG = ":MainActivity";
 
+    private static final int INPUT_SIZE = 320; //350 after warp, reduced to 320 when white balanced
+    private static final int IMAGE_MEAN = 128;
+    private static final float IMAGE_STD = 128.0f;
+    private static final String INPUT_NAME = "Mul:0";
+    private static final String OUTPUT_NAME = "final_result";
+
+    private static final String MODEL_FILE = "file:///android_asset/rounded_graph.pb";
+    private static final String LABEL_FILE = "file:///android_asset/retrained_labels.txt";
+
+    private static final boolean SAVE_PREVIEW_BITMAP = false;
+
+    private static final boolean MAINTAIN_ASPECT = true;
+
+    private static final android.util.Size DESIRED_PREVIEW_SIZE = new android.util.Size(640, 480);
+
+
+
+
     /**
      * Some older devices needs a small delay between UI widget updates
      * and a change of the status and navigation bar.
@@ -136,7 +154,22 @@ public class MainActivity extends AppCompatActivity implements CvCameraViewListe
         mOpenCvCameraView.setMaxFrameSize(800, 600); //frame size
         mOpenCvCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
         mOpenCvCameraView.setCvCameraViewListener(this);
-        mProcessImage = new processImage(this.getBaseContext());
+
+        //TODO: added tensorflow code to figure out number, fill and shape features
+        // See code: tensorflow-for-poets-2\android\src\org\tensorflow\demo\ClassifierActivity.java
+
+        Classifier classifier =
+                TensorFlowImageClassifier.create(
+                        getAssets(),
+                        MODEL_FILE,
+                        LABEL_FILE,
+                        INPUT_SIZE,
+                        IMAGE_MEAN,
+                        IMAGE_STD,
+                        INPUT_NAME,
+                        OUTPUT_NAME);
+
+        mProcessImage = new processImage(this.getBaseContext(),classifier);
         //FIXME mProcessImage.prepareNewGame();
 
     }

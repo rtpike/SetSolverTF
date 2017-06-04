@@ -34,6 +34,8 @@ public class processImage { //} extends AsyncTask<Card, Void, Integer> {
 
     private static final String TAG = "processImage";
     public boolean debug=false;
+    private Classifier classifier;
+
     /*
     Detects cards by finding contours
      */
@@ -48,6 +50,10 @@ public class processImage { //} extends AsyncTask<Card, Void, Integer> {
         context = c;
     }
 
+    processImage(Context c, Classifier classifier) {
+        context = c;
+        this.classifier = classifier;
+    }
 
     public int numCards() {
         /* Returns number of cards detected */
@@ -123,7 +129,7 @@ public class processImage { //} extends AsyncTask<Card, Void, Integer> {
                     Mat ROI = new Mat();
                     warpSubImage(approxCurve, in, ROI);
 
-                    Card cardObj = new Card(context, ROI);
+                    Card cardObj = new Card(context, ROI,this.classifier);
                     //Card cardObj = new Card();
                     //Card cardObj = new Card(approxCurve, in);;
                     cardObj.cardName = String.format("%d", numCards); //used for debugging
