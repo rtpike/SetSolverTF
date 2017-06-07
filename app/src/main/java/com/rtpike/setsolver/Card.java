@@ -6,6 +6,7 @@ import android.os.SystemClock;
 import android.os.Trace;
 import android.util.Log;
 
+import org.opencv.android.Utils;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 
@@ -70,8 +71,7 @@ public class Card implements Runnable {
     public shadeEnum shade = shadeEnum.INVALID;  //0=empty, 1=lines, 2=solid
     public shapeEnum shape = shapeEnum.INVALID;  //"oval", "squiggle", "diamond"
     public Point[] corners; //From full parent image
-
-
+    public Float confidence;
 
 
     private static Classifier classifier;
@@ -149,9 +149,9 @@ public class Card implements Runnable {
             cardImg_markup.width();
             cardImg_markup.height();
             Point center = new Point(cardImg_markup.width() / 10, cardImg_markup.height() / 8);
-            Imgproc.putText(cardImg_markup, decodeCard(), center, Core.FONT_HERSHEY_PLAIN, 2, new Scalar(70, 70, 70));
+            Imgproc.putText(cardImg_markup, decodeCard() + " " + this.confidence, center, Core.FONT_HERSHEY_PLAIN, 2, new Scalar(70, 70, 70));
             //cardImg_markup = cardThreshold;  //debug
-            Log.d(TAG, "Card Info: " + decodeCard() + " ^^^^^^^^^^^^^^^^^^^^^^^");
+            Log.d(TAG, "Card Info: " + decodeCard() + " "+this.confidence +" ^^^^^^^^^^^^^^^^^^^^");
 
         }
 
@@ -165,6 +165,7 @@ public class Card implements Runnable {
 
 
         Bitmap bmp = Bitmap.createBitmap(cardImg_markup.cols(), cardImg_markup.rows(), Bitmap.Config.ARGB_8888);
+        Utils.matToBitmap(cardImg_markup, bmp);
         List<Classifier.Recognition> results = classifier.recognizeImage(bmp);
 
 /*      public Recognition(
@@ -278,10 +279,10 @@ public class Card implements Runnable {
 
     }
 
-    /* Card is valid if all properties of the card are detected */
+    /* Card is valid if all properties of the card are detected  and confidence greater than 0.60*/
     public boolean isValid() {
         return (color != colorEnum.INVALID && shade != shadeEnum.INVALID &&
-                shape != shapeEnum.INVALID && number > 0);
+                shape != shapeEnum.INVALID && number > 0 && confidence > 0.60);
 
     }
 
@@ -337,7 +338,7 @@ public class Card implements Runnable {
         }
 
         if (cardName != null) {
-            return String.format("(%s)%d:%s:%s:%s", cardName, number, colorChar, shadeChar, shapeChar);
+            return String.format("(%s)%d:%s:%s:%s %.2f", cardName, number, colorChar, shadeChar, shapeChar, confidence);
         } else {
             return String.format("%d:%s:%s:%s", number, colorChar, shadeChar, shapeChar);
         }
@@ -349,6 +350,7 @@ public class Card implements Runnable {
          */
         String colorStr, shadeStr, shapeStr;
         String[] features = result.getTitle().split("_"); //example: 1_p_e_s
+        this.confidence = result.getConfidence();
 
         if (features.length != 4) {
             //TODO: throw exception;
